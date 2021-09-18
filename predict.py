@@ -246,6 +246,7 @@ if status == True:
     with st.expander('View result dataset'):
         st.write(nor_result)
 
+    if file_name == None: file_name = 'air_pollution'
     st.download_button('Download result', nor_result.to_csv(), file_name=f'{file_name}_prediction_results.csv')
 
 
