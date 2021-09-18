@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 # from sklearn import metrics
 from sklearn.metrics import mean_squared_error
+from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import MinMaxScaler
 from keras.models import Sequential, load_model
 from keras.layers import LSTM, Dense, Dropout
@@ -14,6 +15,9 @@ from keras.utils.vis_utils import plot_model
 from MultiFunctions.multiFunc import *
 from MultiFunctions.information import information
 from streamlit_echarts import st_echarts
+import datetime as dt
+from dateutil.relativedelta import relativedelta # to add days or years
+
 
 st.set_page_config(
     page_title="Air Pollution Prediction", 
@@ -23,7 +27,7 @@ st.sidebar.subheader('Dataset')
 status, df, file_name = file_upload('Please upload a multivariate dataset')
 st.sidebar.markdown(information['profile'],unsafe_allow_html=True)
 
-st.title('Multivariate Prediction')
+st.title('Multivariate Time-Series Prediction')
 st.subheader('Using Keras Long-Short Term Memory (LSTM) Neural Network')
 st.text("")
 sample = False
@@ -44,14 +48,19 @@ if status:
     if not sample:
         extract_features_from_date(df)
     
+    df = filter_df(df)
+
+
     feat_col1, feat_col2 = st.columns(2)
     with feat_col1: feature_cols = st.multiselect('Please select columns to plot',list(df),key='plot_col')
     with feat_col2: scale_plot = st.radio('Normalize plot [Min-Max]', ['Yes','No'], index=1)
 
+    df_non_numeric = df.select_dtypes(include=['object'])
+    ignore_cols = list(df_non_numeric)
+
     if feature_cols:
 
-        df_non_numeric = df.select_dtypes(include=['object'])
-        ignore_cols = list(df_non_numeric)
+
         new_feature_cols = [i for i in feature_cols if any(i for j in ignore_cols if str(j) not in i)]
         st.write(f'Can\'t plot {list(ignore_cols)} as is it not a numeric column')
   
@@ -93,7 +102,7 @@ if status == True:
 
     l_col1, l_col2, *l_colx = st.columns(no_layers)
 
-    with l_col1: layer_1 = st.slider('Layer 1 Nodes', min_value=1, max_value=100, value=10, step=1)
+    with l_col1: layer_1 = st.slider('Layer 1 Nodes', min_value=1, max_value=100, value=20, step=1)
     with l_col2: layer_2 = st.slider('Layer 2 Nodes', min_value=1, max_value=100, value=10, step=1)
     layer_list = [period,layer_1, layer_2]
     layer_desc = ['Input','Layer 1', 'Layer 2']
@@ -116,39 +125,49 @@ if status == True:
             loss = st.selectbox('Loss Function',['mean_squared_error','mean_absolute_error'])
         col4_3, col4_4 = st.columns(2)
         with col4_3:
-            epochs = int(st.number_input('Training epoch',1,100,10,5))
+            epochs = int(st.number_input('Training epoch',1,100,2,1))
         with col4_4:
-            batchsize = int(st.number_input('Batch Size',1,100,10,5))
+            batchsize = int(st.number_input('Batch Size',1,100,50,5))
+
+    # encode non-numberic data
+    encoder = LabelEncoder()
+    for each in ignore_cols:
+        df[each] =  encoder.fit_transform(df[each])
 
 
-    data=df.sort_index(ascending=True,axis=0)
-    data[label_col] = data[label_col].replace({'\$': '', ',': '','€':''}, regex=True).astype(float)
-    predict_df=data[[label_col]]
+    shifted = create_period_shift(df,label_col,period=period)
+    features_shifted = shifted.drop(label_col,axis=1)
+    target_shifted = shifted[[label_col]]
 
-    dataset = predict_df.values
-    dataset = dataset.astype('float32')
+    features_dataset = features_shifted.values
+    target_dataset = target_shifted.values
+    
+    features_dataset = features_dataset.astype('float32')
+    target_dataset = target_dataset.astype('float32')
 
 
     # normalize the dataset
-    scaler = MinMaxScaler(feature_range=(0, 1))
-    dataset = scaler.fit_transform(dataset)
+    features_scaler = MinMaxScaler(feature_range=(0, 1))
+    target_scaler = MinMaxScaler(feature_range=(0,1))
+
+    tr_dataset = features_scaler.fit_transform(features_dataset)
+    ts_dataset = target_scaler.fit_transform(target_dataset)
     # split into train and test sets
-    test_size = int(len(dataset) * test_size_ratio)
-    train_size = len(dataset) - test_size
+    test_size = int(len(shifted) * test_size_ratio)
+    train_size = len(shifted) - test_size
 
-    train, test = dataset[0:train_size,:], dataset[train_size:len(dataset),:]
 
-    trainX, trainY = create_dataset(train, period)
-    testX, testY = create_dataset(test, period)
+
+    trainX, trainY = tr_dataset[:train_size, :], ts_dataset[:train_size, :]
+    testX, testY = tr_dataset[train_size:, :], ts_dataset[train_size:, :]
 
     # reshape input to be [samples, time steps, features]
     trainX = np.reshape(trainX, (trainX.shape[0], 1, trainX.shape[1]))
     testX = np.reshape(testX, (testX.shape[0], 1, testX.shape[1]))
 
 
-
     lstm_model=Sequential()
-    lstm_model.add(LSTM(units=layer_1,return_sequences=True,input_shape=(1, period)))
+    lstm_model.add(LSTM(units=layer_1,return_sequences=True,input_shape=(trainX.shape[1], trainX.shape[2])))
     if no_layers == 2:
         lstm_model.add(LSTM(units=layer_2))
     else:
@@ -165,9 +184,9 @@ if status == True:
 
     with st.expander('View model layer diagram'):
 
-        plot_model(lstm_model,'data/image.png',show_shapes=True)
-        st.image('data/image.png')
-
+        plot_model(lstm_model,'sample_data/image.png',show_shapes=True)
+        st.image('sample_data/image.png')
+    with st.expander('View network architecture'):
         fig = plt.figure(figsize=(12, 12))
         ax = fig.gca()
         ax.axis('off')
@@ -176,46 +195,57 @@ if status == True:
 
     lstm_model.compile(loss=loss, optimizer=optimizer)
     with st.spinner('Training Model..'):
-        lstm_model.fit(trainX, trainY, epochs=epochs, batch_size=batchsize, verbose=2)
+        lstm_model.fit(trainX, trainY, epochs=epochs, batch_size=batchsize,validation_data=(testX, testY), verbose=2)
 
         # make predictions
         trainPredict = lstm_model.predict(trainX)
         testPredict = lstm_model.predict(testX)
+        
         # invert predictions
-        trainPredict = scaler.inverse_transform(trainPredict)
-        trainY = scaler.inverse_transform([trainY])
-        testPredict = scaler.inverse_transform(testPredict)
-        testY = scaler.inverse_transform([testY])
+        trainPredict = target_scaler.inverse_transform(trainPredict)
+        trainY = target_scaler.inverse_transform(trainY)
+
+        
+        testPredict = target_scaler.inverse_transform(testPredict)
+        testY = target_scaler.inverse_transform(testY)
     # calculate root mean squared error
-    trainScore = math.sqrt(mean_squared_error(trainY[0], trainPredict[:,0]))
-    testScore = math.sqrt(mean_squared_error(testY[0], testPredict[:,0]))
+    trainScore = math.sqrt(mean_squared_error(trainY, trainPredict))
+    testScore = math.sqrt(mean_squared_error(testY, testPredict))
 
 
     # shift train predictions for plotting
-    trainPredictPlot = np.empty_like(dataset)
+    trainPredictPlot = np.empty_like(target_shifted)
     trainPredictPlot[:, :] = np.nan
-    trainPredictPlot[period:len(trainPredict)+period, :] = trainPredict
+    trainPredictPlot[:len(trainPredict), :] = trainPredict
     # shift test predictions for plotting
-    testPredictPlot = np.empty_like(dataset)
+    testPredictPlot = np.empty_like(target_shifted)
     testPredictPlot[:, :] = np.nan
-    testPredictPlot[len(trainPredict)+(period*2)+1:len(dataset)-1, :] = testPredict
+    testPredictPlot[len(trainPredict):len(target_shifted), :] = testPredict
 
-    result_df = pd.DataFrame(scaler.inverse_transform(dataset),columns=[label_col])
+    result_df = pd.DataFrame(target_scaler.inverse_transform(ts_dataset),columns=[label_col])
     result_df['Prediction on training set']=trainPredictPlot
-    result_df['Prediction on training set'] = result_df['Prediction on training set'].shift(-2)
-
     result_df['Prediction on test set'] = testPredictPlot
-    result_df['Prediction on test set'] = result_df['Prediction on test set'].shift(-2)
 
-    result_df.index = data.index
+   
+    result_df.index = df[[label_col]].shift(-(period)).dropna().index
     st.title('Result')
     result1, result2 = st.columns(2)
     with result1: st.write('Train Score: %.2f RMSE' % (trainScore))
     with result2: st.write('Test Score: %.2f RMSE' % (testScore))
-    st.subheader('Plot')
-    st.line_chart(result_df)
+    
+    with result1: st.subheader('Plot')
+    with result2: scale_result = st.radio('Normalize result [Min-Max]', ['Yes','No'], index=1)
+
+    if scale_result == 'Yes':
+        nor_result = (result_df-result_df.min())/(result_df.max()-result_df.min())
+    else:
+        nor_result = result_df
+
+    st.line_chart(nor_result)
+
     with st.expander('View result dataset'):
-        st.write(result_df)
-    st.download_button('Download result', result_df.to_csv(), file_name=f'{file_name}_prediction_results.csv')
+        st.write(nor_result)
+
+    st.download_button('Download result', nor_result.to_csv(), file_name=f'{file_name}_prediction_results.csv')
 
 

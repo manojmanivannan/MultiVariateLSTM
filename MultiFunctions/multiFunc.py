@@ -3,6 +3,7 @@ from altair.vegalite.v4.schema.core import Value
 import streamlit as st
 import pandas as pd
 import numpy as np
+import datetime
 from datetime import datetime
 
 
@@ -82,6 +83,27 @@ def create_dataset(dataset, look_back=1):
         dataX.append(a)
         dataY.append(dataset[i + look_back, 0])
     return np.array(dataX), np.array(dataY)
+
+def create_period_shift(df,remove_col,period=4):
+    tmp_df = df.copy()
+    col_names = list(df)
+    for col in col_names:
+        for i in range(period):
+            new_col = (col+'_'+str(i+1))
+            tmp_df[new_col] = tmp_df[col].shift(-(i+1))
+    
+
+    return tmp_df.drop([ x for x in col_names if x != remove_col],axis=1).dropna()
+
+def filter_df(df,message='Select range to filter'):
+    
+    start_date = df.index.to_pydatetime()[0]
+    end_date = df.index.to_pydatetime()[-1]
+    slider_3, slider_4 = st.slider('%s' % (message),start_date,end_date,(start_date,end_date))
+    df = df.loc[slider_3:slider_4][:]
+
+    return df
+
 
 
 import matplotlib.pyplot as plt
