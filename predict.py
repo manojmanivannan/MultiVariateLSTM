@@ -62,7 +62,7 @@ if status:
 
 
         new_feature_cols = [i for i in feature_cols if any(i for j in ignore_cols if str(j) not in i)]
-        st.write(f'Can\'t plot {list(ignore_cols)} as is it not a numeric column')
+        st.write(f'Can\'t plot {list(ignore_cols)} as it\'s not a numeric column')
   
         if scale_plot == 'Yes':
             nor_data = (df[new_feature_cols]-df[new_feature_cols].min())/(df[new_feature_cols].max()-df[new_feature_cols].min())
