@@ -1,0 +1,11 @@
+altair==4.1.0
+graphviz==0.17
+pandas==1.3.3
+keras==2.6.0
+streamlit==0.88.0
+tensorflow==2.6.0
+streamlit_echarts==0.3.0
+numpy==1.19.5
+pydot==1.4.2
+matplotlib==3.4.3
+scikit_learn==0.24.2
