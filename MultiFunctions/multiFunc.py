@@ -10,12 +10,12 @@ from datetime import datetime
 # fix random seed for reproducibility
 np.random.seed(7)
 
-def file_upload(name):
+def file_upload(name,separator=','):
     uploaded_file = st.sidebar.file_uploader('%s' % (name),key='%s' % (name),accept_multiple_files=False)
     content = False
     if uploaded_file is not None:
         try:
-            uploaded_df = pd.read_csv(uploaded_file)
+            uploaded_df = pd.read_csv(uploaded_file,sep=separator)
             content = True
             return content, uploaded_df, uploaded_file.name.split('.')[0]
         except:
@@ -31,7 +31,7 @@ def file_upload(name):
 
 def extract_features_from_date(df):
     format_col1, format_col2 = st.columns(2)
-    with format_col1: date_format = st.selectbox('Date format', ['YYYY MM DD','MM DD YYYY'], index=0)
+    with format_col1: date_format = st.selectbox('Date format', ['YYYY MM DD','MM DD YYYY','DD MM YYYY'], index=0)
     with format_col2: separator = st.radio("Date separator", ('-', '/'))
 
 
@@ -39,16 +39,46 @@ def extract_features_from_date(df):
         d_format = "%m#%d#%Y".replace('#',separator)
     if date_format == 'YYYY MM DD':
         d_format = "%Y#%m#%d".replace('#',separator)
+    if date_format == 'DD MM YYYY':
+        d_format = "%d#%m#%Y".replace('#',separator)
     
+    with st.expander('Time format'):
+        is_time = st.radio("Format Time column", ('Yes', 'No'), index=1)
+        if is_time == 'Yes':
+            format_col3, format_col4 = st.columns(2)
+            with format_col3: time_format = st.selectbox('Time format',['HH MM','HH MM SS'], index=1)
+            with format_col4: time_separator = st.radio("Time separator", ('.', ':'))
+
+            if time_format == 'HH MM':
+                t_format = "%H#%M".replace('#',time_separator)
+            if time_format == 'HH MM SS':
+                t_format = "%H#%M#%S".replace('#',time_separator)
+
     try:
-        df["Date"]=pd.to_datetime(df.Date,format=d_format)
-        df.index=df['Date']
-        # df.drop('Date',axis=1,inplace=True)
+        if is_time == 'No':
+            df["DateTime"]=pd.to_datetime(df.Date,format=d_format)
+        else:
+            d_format = d_format+' '+t_format
+            df['DateTime'] = df['Date'].str.cat(df['Time'],sep=" ")
+            df['DateTime'] = pd.to_datetime(df['DateTime'], format=d_format)
+ 
+        df.index=df['DateTime']
+        df.drop('DateTime',axis=1,inplace=True)
         df = df.sort_index(axis=0)
         return df
     except Exception as e:
         st.write(f'{e}')
         st.stop()
+
+def drop_columns_from_df(df):
+    to_drop_columns = st.multiselect('Select columns to drop (Usually data/time or columns of no value)',list(df))
+    df.drop(to_drop_columns,axis=1,inplace=True)
+
+def fill_na_records(df):
+    # nan_values = st.text_input('Comma separated values that are conisder NaN')
+    # nan_values = nan_values.split(',')
+    # df.replace(nan_values,np.nan)
+    df.dropna(axis=0,inplace=True)
 
 def load_sample_data():
 
@@ -97,8 +127,12 @@ def create_period_shift(df,remove_col,period=4):
 
 def filter_df(df,message='Select range to filter'):
     
-    start_date = df.index.to_pydatetime()[0]
-    end_date = df.index.to_pydatetime()[-1]
+    try:
+        start_date = df.index.to_pydatetime()[0]
+        end_date = df.index.to_pydatetime()[-1]
+    except Exception as e:
+        st.write("Please drop incompatible columns !")
+        st.stop()
     slider_3, slider_4 = st.slider('%s' % (message),start_date,end_date,(start_date,end_date))
     df = df.loc[slider_3:slider_4][:]
 

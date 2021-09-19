@@ -24,7 +24,8 @@ st.set_page_config(
     page_icon='https://cdn-icons-png.flaticon.com/512/2640/2640447.png')
 
 st.sidebar.subheader('Dataset')
-status, df, file_name = file_upload('Please upload a multivariate dataset')
+separator = st.sidebar.selectbox('CSV column separator',[',',';','|'])
+status, df, file_name = file_upload('Please upload a multivariate dataset',separator)
 st.sidebar.markdown(information['profile'],unsafe_allow_html=True)
 
 st.title('Multivariate Time-Series Prediction')
@@ -38,7 +39,7 @@ if not status:
         sample = True
     else:
         st.write('Please use the sidebar to upload your dataset !')
-        st.write('There are many ways to download data, check out https://archive.ics.uci.edu/ml/index.php for example.')
+        st.write('There are many ways to download data, check out <a target="_blank" rel="noopener noreferrer" href=\'https://archive.ics.uci.edu/ml/index.php\'>this one</a> for example or download one from  <a target="_blank" rel="noopener noreferrer" href=\'https://github.com/manojmanivannan/DataScience/blob/master/Air-Quality/data/AirQualityUCI.csv\'>here</a>',unsafe_allow_html=True)
 
 
 if status:
@@ -48,8 +49,13 @@ if status:
     if not sample:
         extract_features_from_date(df)
     
+    drop_columns_from_df(df)
+    fill_na_records(df)
+    
     df = filter_df(df)
 
+    with st.expander('View final dataset'):
+        st.write(df)
 
     feat_col1, feat_col2 = st.columns(2)
     with feat_col1: feature_cols = st.multiselect('Please select columns to plot',list(df),key='plot_col')
@@ -84,14 +90,13 @@ if status == True:
 
     st.title('Training')
     st.subheader('Parameters')
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col4 = st.columns(3)
 
     with col1:
         label_col = st.selectbox('Column to predict',col_names)
     with col2:
         test_size_ratio = st.number_input('Test size',0.01,0.99,0.25,0.05)
-    with col3:
-        period = int(st.number_input('Lookback Period',1,10,4,1))
+
     with col4:
         no_layers = int(st.number_input('# of layers',2,10,2,1))
 
@@ -99,6 +104,19 @@ if status == True:
         st.write('Can\'t apply model on \'Date\' column. Select another column to proceed !')
         st.stop()
     
+    with st.expander('Advanced Parameters'):
+        col4_1, col4_2, col3 = st.columns(3)
+        with col4_1:
+            optimizer = st.selectbox('Solver',['Adam','Adagrad','RMSprop','Nadam'])
+        with col4_2:
+            loss = st.selectbox('Loss Function',['mean_squared_error','mean_absolute_error'])
+        with col3:
+            period = int(st.number_input('Lookback Period',1,10,4,1))
+        col4_3, col4_4 = st.columns(2)
+        with col4_3:
+            epochs = int(st.number_input('Training epoch',1,100,2,1))
+        with col4_4:
+            batchsize = int(st.number_input('Batch Size',1,100,50,5))
 
     l_col1, l_col2, *l_colx = st.columns(no_layers)
 
@@ -117,17 +135,7 @@ if status == True:
     layer_list.append(1)
     layer_desc.append('Output')
 
-    with st.expander('Advanced Parameters'):
-        col4_1, col4_2 = st.columns(2)
-        with col4_1:
-            optimizer = st.selectbox('Solver',['Adam','Adagrad','RMSprop','Nadam'])
-        with col4_2:
-            loss = st.selectbox('Loss Function',['mean_squared_error','mean_absolute_error'])
-        col4_3, col4_4 = st.columns(2)
-        with col4_3:
-            epochs = int(st.number_input('Training epoch',1,100,2,1))
-        with col4_4:
-            batchsize = int(st.number_input('Batch Size',1,100,50,5))
+
 
     # encode non-numberic data
     encoder = LabelEncoder()
