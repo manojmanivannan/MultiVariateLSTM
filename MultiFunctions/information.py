@@ -10,7 +10,7 @@ information = {
         <p>
         <h4>My Works So Far</h4>
         <ul>
-        <li><a href=\"https://github.com/manojmanivannan\ target="_blank" rel="noopener noreferrer"">Github</a></li>
+        <li><a href=\"https://github.com/manojmanivannan\" target="_blank" rel="noopener noreferrer"">Github</a></li>
         <li><a href=\"https://gitlab.com/manojm18\" target="_blank" rel="noopener noreferrer">GitLab</a></li>
         </ul>
         </p>
