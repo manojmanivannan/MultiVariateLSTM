@@ -96,7 +96,7 @@ def load_sample_data():
     dataset = dataset[24:]
         
     # save to file
-    dataset.to_csv('sample_data/pollution_cleaned.csv')
+    # dataset.to_csv('sample_data/pollution_cleaned.csv')
     return dataset
 
 
