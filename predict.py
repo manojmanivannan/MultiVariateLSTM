@@ -17,6 +17,7 @@ from MultiFunctions.information import information
 from streamlit_echarts import st_echarts
 import datetime as dt
 from dateutil.relativedelta import relativedelta # to add days or years
+import cufflinks as cf
 
 
 st.set_page_config(
@@ -76,14 +77,19 @@ if status:
             nor_data = df[new_feature_cols]
             
         # nor_data.index.name = "Date"
-        data = nor_data.reset_index().melt('date',var_name='Feature',value_name='Value')
-        a = alt.Chart(data).mark_line().encode(
-            x='date',
-            y='Value',
-            color='Feature'
-            ).interactive()
+        # data = nor_data.reset_index().melt('date',var_name='Feature',value_name='Value')
+        # a = alt.Chart(data).mark_line().encode(
+        #     x='date',
+        #     y='Value',
+        #     color='Feature'
+        #     ).interactive()
 
-        st.altair_chart(a,use_container_width=True)
+        # st.altair_chart(a,use_container_width=True)
+
+        fig_plot = nor_data.iplot(asFigure=True)
+        fig_plot.update_layout(plot_bgcolor='rgba(17,17,17,0)',paper_bgcolor ='rgba(10,10,10,0)', legend_bgcolor='rgba(0,0,0,0)')
+        st.plotly_chart(fig_plot)
+
 
 if status == True:
     col_names = list(df)
@@ -249,7 +255,11 @@ if status == True:
     else:
         nor_result = result_df
 
-    st.line_chart(nor_result)
+
+    # st.line_chart(nor_result)
+    fig_result = nor_result.iplot(asFigure=True)
+    fig_result.update_layout(plot_bgcolor='rgba(17,17,17,0)',paper_bgcolor ='rgba(10,10,10,0)',legend_bgcolor='rgba(0,0,0,0)')
+    st.plotly_chart(fig_result)
 
     with st.expander('View result dataset'):
         st.write(nor_result)
