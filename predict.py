@@ -75,8 +75,8 @@ if status:
         else:
             nor_data = df[new_feature_cols]
             
-
-        data = nor_data.reset_index().melt('Date',var_name='Feature',value_name='Value')
+        # nor_data.index.name = "Date"
+        data = nor_data.reset_index().melt('date',var_name='Feature',value_name='Value')
         a = alt.Chart(data).mark_line().encode(
             x='date',
             y='Value',
