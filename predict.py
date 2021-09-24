@@ -18,6 +18,7 @@ from streamlit_echarts import st_echarts
 import datetime as dt
 from dateutil.relativedelta import relativedelta # to add days or years
 import cufflinks as cf
+from keras import backend as K
 
 
 st.set_page_config(
@@ -214,6 +215,9 @@ if status == True:
         # make predictions
         trainPredict = lstm_model.predict(trainX)
         testPredict = lstm_model.predict(testX)
+
+        K.clear_session()
+        del lstm_model
         
         # invert predictions
         trainPredict = target_scaler.inverse_transform(trainPredict)
