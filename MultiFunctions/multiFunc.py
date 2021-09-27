@@ -71,7 +71,7 @@ def extract_features_from_date(df):
         st.stop()
 
 def drop_columns_from_df(df):
-    to_drop_columns = st.multiselect('Select columns to drop (Usually data/time or columns of no value)',list(df))
+    to_drop_columns = st.multiselect('Select columns to drop (Usually columns of no value)',list(df))
     df.drop(to_drop_columns,axis=1,inplace=True)
 
 def fill_na_records(df):
