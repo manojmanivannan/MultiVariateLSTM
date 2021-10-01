@@ -19,7 +19,6 @@ import datetime as dt
 from dateutil.relativedelta import relativedelta # to add days or years
 import cufflinks as cf
 from keras import backend as K
-import io
 
 
 st.set_page_config(
@@ -232,7 +231,7 @@ if status == True:
         # make predictions
         trainPredict = lstm_model.predict(trainX)
         testPredict = lstm_model.predict(testX)
-    
+
         # invert predictions
         trainPredict = target_scaler.inverse_transform(trainPredict)
         trainY = target_scaler.inverse_transform(trainY)
@@ -282,7 +281,7 @@ if status == True:
     with st.expander('View result dataset'):
         st.write(nor_result)
 
-    if file_name == None: file_name = 'air_pollution'
+    if file_name == None: file_name = 'multivariate'
     st.download_button('Download result', nor_result.to_csv(), file_name=f'{file_name}_prediction_results.csv')
     st.download_button('Download trained Model', nor_result.to_csv(), file_name=f'{file_name}_prediction_results.csv')
     K.clear_session()
