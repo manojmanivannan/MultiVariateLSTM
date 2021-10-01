@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import altair as alt
-import math
+import math, time
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 # from sklearn import metrics
@@ -17,6 +17,9 @@ from MultiFunctions.information import information
 from streamlit_echarts import st_echarts
 import datetime as dt
 from dateutil.relativedelta import relativedelta # to add days or years
+import cufflinks as cf
+from keras import backend as K
+import io
 
 
 st.set_page_config(
@@ -32,6 +35,20 @@ st.title('Multivariate Time-Series Prediction')
 st.subheader('Using Keras Long-Short Term Memory (LSTM) Neural Network')
 st.text("")
 sample = False
+with st.expander('Download from yahoo finance !'):
+    company = st.selectbox('Select company',['AAPL','TSLA','BTC-USD'], index=1)
+    st_dt, ed_dt = st.columns(2)
+    with st_dt: start_date = st.date_input('From', dt.date(2021,1,1))
+    with ed_dt: end_date = st.date_input('To', dt.date(2021,9,1))
+
+    period1 = int(time.mktime(start_date.timetuple()))
+    period2 = int(time.mktime(end_date.timetuple()))
+    interval = '1d' # 1d, 1m
+
+    query_string = f'https://query1.finance.yahoo.com/v7/finance/download/{company}?period1={period1}&period2={period2}&interval={interval}&events=history&includeAdjustedClose=true'
+    df_downloaded = pd.read_csv(query_string)
+    st.write(df_downloaded)
+    st.download_button('Download stock data', df_downloaded.to_csv(), file_name=f'{company}.csv')
 if not status:
     if st.radio('Use Sample Air pollution dataset', ['Yes','No'], index=1) == 'Yes':
         df = load_sample_data()
@@ -67,7 +84,7 @@ if status:
     if feature_cols:
 
 
-        new_feature_cols = [i for i in feature_cols if any(i for j in ignore_cols if str(j) not in i)]
+        new_feature_cols = [i for i in feature_cols if i not in ignore_cols]
         st.write(f'Can\'t plot {list(ignore_cols)} as it\'s not a numeric column')
   
         if scale_plot == 'Yes':
@@ -75,15 +92,20 @@ if status:
         else:
             nor_data = df[new_feature_cols]
             
+        # nor_data.index.name = "Date"
+        # data = nor_data.reset_index().melt('date',var_name='Feature',value_name='Value')
+        # a = alt.Chart(data).mark_line().encode(
+        #     x='date',
+        #     y='Value',
+        #     color='Feature'
+        #     ).interactive()
 
-        data = nor_data.reset_index().melt('date',var_name='Feature',value_name='Value')
-        a = alt.Chart(data).mark_line().encode(
-            x='date',
-            y='Value',
-            color='Feature'
-            ).interactive()
+        # st.altair_chart(a,use_container_width=True)
 
-        st.altair_chart(a,use_container_width=True)
+        fig_plot = nor_data.iplot(asFigure=True)
+        fig_plot.update_layout(plot_bgcolor='rgba(17,17,17,0)',paper_bgcolor ='rgba(10,10,10,0)', legend_bgcolor='rgba(0,0,0,0)')
+        st.plotly_chart(fig_plot)
+
 
 if status == True:
     col_names = list(df)
@@ -111,12 +133,15 @@ if status == True:
         with col4_2:
             loss = st.selectbox('Loss Function',['mean_squared_error','mean_absolute_error'])
         with col3:
-            period = int(st.number_input('Lookback Period',1,10,4,1))
-        col4_3, col4_4 = st.columns(2)
+            period = int(st.number_input('Lookback Period',1,10,4,1,help="Learning window"))
+        col4_3, col4_4, col4_5 = st.columns(3)
         with col4_3:
             epochs = int(st.number_input('Training epoch',1,100,2,1))
         with col4_4:
             batchsize = int(st.number_input('Batch Size',1,100,50,5))
+        with col4_5:
+            treat_as_single = st.radio('Treat as single variate',['Yes','No'],index=1,help="Ignore all columns other than \"{}\" from the model".format(label_col))
+            if treat_as_single == 'Yes': df = df[[label_col]]
 
     l_col1, l_col2, *l_colx = st.columns(no_layers)
 
@@ -136,11 +161,11 @@ if status == True:
     layer_desc.append('Output')
 
 
-
     # encode non-numberic data
     encoder = LabelEncoder()
     for each in ignore_cols:
-        df[each] =  encoder.fit_transform(df[each])
+        if each in list(df):
+            df[each] =  encoder.fit_transform(df[each])
 
 
     shifted = create_period_shift(df,label_col,period=period)
@@ -191,7 +216,6 @@ if status == True:
     lstm_model.add(Dense(1))
 
     with st.expander('View model layer diagram'):
-
         plot_model(lstm_model,'sample_data/image.png',show_shapes=True)
         st.image('sample_data/image.png')
     with st.expander('View network architecture'):
@@ -208,7 +232,7 @@ if status == True:
         # make predictions
         trainPredict = lstm_model.predict(trainX)
         testPredict = lstm_model.predict(testX)
-        
+    
         # invert predictions
         trainPredict = target_scaler.inverse_transform(trainPredict)
         trainY = target_scaler.inverse_transform(trainY)
@@ -249,12 +273,17 @@ if status == True:
     else:
         nor_result = result_df
 
-    st.line_chart(nor_result)
+
+    # st.line_chart(nor_result)
+    fig_result = nor_result.iplot(asFigure=True)
+    fig_result.update_layout(plot_bgcolor='rgba(17,17,17,0)',paper_bgcolor ='rgba(10,10,10,0)',legend_bgcolor='rgba(0,0,0,0)')
+    st.plotly_chart(fig_result)
 
     with st.expander('View result dataset'):
         st.write(nor_result)
 
     if file_name == None: file_name = 'air_pollution'
     st.download_button('Download result', nor_result.to_csv(), file_name=f'{file_name}_prediction_results.csv')
-
-
+    st.download_button('Download trained Model', nor_result.to_csv(), file_name=f'{file_name}_prediction_results.csv')
+    K.clear_session()
+    del lstm_model
