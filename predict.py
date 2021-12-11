@@ -19,6 +19,7 @@ import datetime as dt
 from dateutil.relativedelta import relativedelta # to add days or years
 import cufflinks as cf
 from keras import backend as K
+import pickle
 
 
 st.set_page_config(
@@ -227,6 +228,7 @@ if status == True:
     lstm_model.compile(loss=loss, optimizer=optimizer)
     with st.spinner('Training Model..'):
         lstm_model.fit(trainX, trainY, epochs=epochs, batch_size=batchsize,validation_data=(testX, testY), verbose=2)
+        lstm_model.save('trained_model.h5')
 
         # make predictions
         trainPredict = lstm_model.predict(trainX)
@@ -283,6 +285,7 @@ if status == True:
 
     if file_name == None: file_name = 'multivariate'
     st.download_button('Download result', nor_result.to_csv(), file_name=f'{file_name}_prediction_results.csv')
-    st.download_button('Download trained Model', nor_result.to_csv(), file_name=f'{file_name}_prediction_results.csv')
+    with open("trained_model.h5", "rb") as fp:
+        st.download_button(label="Download Model",data=fp,file_name=f'{file_name}_trained_model.h5',mime="application/zip" )
     K.clear_session()
     del lstm_model
